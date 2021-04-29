@@ -299,8 +299,7 @@ void TypeLoweringVisitor::visitDecl(FExtModuleOp extModule) {
       // anotations.
       attributes.push_back(NamedAttribute(
           Identifier::get(
-              mlir::impl::getArgAttrName(newArgNumber++, attrNameBuf),
-              context),
+              mlir::impl::getArgAttrName(newArgNumber++, attrNameBuf), context),
           builder.getDictionaryAttr(extModule.getArgAttrs(oldArgNumber))));
     }
     ++oldArgNumber;
