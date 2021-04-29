@@ -150,6 +150,7 @@ private:
   // State to track the new attributes for the module.
   SmallVector<NamedAttribute, 8> newModuleAttrs;
   SmallVector<Attribute> newArgNames;
+  SmallVector<ArrayRef<NamedAttribute>, 8> newArgAttrs;
   size_t originalNumModuleArgs;
 };
 } // end anonymous namespace
@@ -200,12 +201,27 @@ void TypeLoweringVisitor::visitDecl(FModuleOp module) {
   auto *argAttrBegin = originalArgAttrs.begin();
   auto *argAttrEnd = originalArgAttrs.end();
   for (auto attr : originalAttrs)
-    if (std::lower_bound(argAttrBegin, argAttrEnd, attr) == argAttrEnd)
-      if (attr.first.str() != "portNames")
-        newModuleAttrs.push_back(attr);
+    if (std::lower_bound(argAttrBegin, argAttrEnd, attr) == argAttrEnd) {
+      // Drop old "portNames" and argument attributes.  These are
+      // handled differently below.
+      if (attr.first == "portNames" || mlir::impl::isArgAttrName(attr.first))
+        continue;
+      newModuleAttrs.push_back(attr);
+    }
 
   newModuleAttrs.push_back(NamedAttribute(Identifier::get("portNames", context),
                                           builder->getArrayAttr(newArgNames)));
+
+  SmallString<8> attrNameBuf;
+  // Attach new argument attributes.
+  for (size_t i = 0, e = newArgAttrs.size(); i != e; ++i) {
+    auto attrs = newArgAttrs[i];
+    if (attrs.empty())
+      continue;
+    newModuleAttrs.push_back(NamedAttribute(
+        Identifier::get(mlir::impl::getArgAttrName(i, attrNameBuf), context),
+        builder->getDictionaryAttr(attrs)));
+  }
 
   // Update the module's attributes.
   module->setAttrs(newModuleAttrs);
@@ -257,9 +273,11 @@ void TypeLoweringVisitor::visitDecl(FExtModuleOp extModule) {
 
   // Create an array of the result types and results names.
   SmallVector<Type, 8> inputTypes;
-  SmallVector<DictionaryAttr, 8> attributes;
+  SmallVector<NamedAttribute, 8> attributes;
 
   SmallVector<Attribute> portNames;
+  unsigned oldArgNumber = 0, newArgNumber = 0;
+  SmallString<8> attrNameBuf;
   for (auto &port : extModule.getPorts()) {
     // Flatten the port type.
     SmallVector<FlatBundleFieldEntry, 8> fieldTypes;
@@ -274,10 +292,34 @@ void TypeLoweringVisitor::visitDecl(FExtModuleOp extModule) {
       else
         pName = builder.getStringAttr("");
       portNames.push_back(pName);
+
+      // Copy argument attributes from the old port to the new port.
+      //
+      // TODO: This should add special handling for targeted
+      // anotations.
+      attributes.push_back(NamedAttribute(
+          Identifier::get(
+              mlir::impl::getArgAttrName(newArgNumber++, attrNameBuf),
+              context),
+          builder.getDictionaryAttr(extModule.getArgAttrs(oldArgNumber))));
     }
+    ++oldArgNumber;
   }
-  extModule->setAttr(Identifier::get("portNames", context),
-                     builder.getArrayAttr(portNames));
+
+  // Add port names attribute.
+  attributes.push_back(
+      {Identifier::get("portNames", context), builder.getArrayAttr(portNames)});
+
+  // Copy over any lingering attributes which are not "portNames" or
+  // argument attributes.
+  for (auto a : extModule->getAttrs()) {
+    if (a.first == "portNames" || mlir::impl::isArgAttrName(a.first))
+      continue;
+    attributes.push_back(a);
+  }
+
+  // Set the attributes.
+  extModule->setAttrs(builder.getDictionaryAttr(attributes));
 
   // Set the type and then bulk set all the names.
   extModule.setType(builder.getFunctionType(inputTypes, {}));
@@ -833,6 +875,7 @@ Value TypeLoweringVisitor::addArg(FModuleOp module, Type type,
   Attribute newArg =
       builder->getStringAttr(nameAttr.getValue().str() + nameSuffix.str());
   newArgNames.push_back(newArg);
+  newArgAttrs.push_back(module.getArgAttrs(oldArgNumber));
 
   return newValue;
 }
