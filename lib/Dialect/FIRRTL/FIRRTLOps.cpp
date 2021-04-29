@@ -312,8 +312,15 @@ static void buildModule(OpBuilder &builder, OperationState &result,
   SmallString<8> attrNameBuf;
   // Record the names of the arguments if present.
   SmallVector<Attribute, 4> portNames;
-  for (size_t i = 0, e = ports.size(); i != e; ++i)
+  for (size_t i = 0, e = ports.size(); i != e; ++i) {
     portNames.push_back(ports[i].name);
+    if (!ports[i].annotations)
+      continue;
+    result.addAttribute(
+        getArgAttrName(i, attrNameBuf),
+        builder.getDictionaryAttr({{builder.getIdentifier("firrtl.annotations"),
+                                    ports[i].annotations}}));
+  }
 
   result.addAttribute("portNames", builder.getArrayAttr(portNames));
 
