@@ -2556,12 +2556,14 @@ ParseResult FIRStmtParser::parseWire() {
       parseToken(FIRToken::colon, "expected ':' in wire") ||
       parseType(type, "expected wire type") || parseOptionalInfo(info))
     return failure();
+  type = DuplexFlow::get(type);
 
   ArrayAttr annotations = getState().emptyArrayAttr;
   getAnnotations(getModuleTarget() + ">" + id, annotations);
   auto name = hasDontTouch(annotations) ? id : filterUselessName(id);
 
-  auto result = builder.create<WireOp>(info.getLoc(), type, name, annotations);
+  auto result = builder.create<WireOp>(info.getLoc(), type,
+                                       name, annotations);
   return addSymbolEntry(id, result, info.getFIRLoc());
 }
 
@@ -2597,6 +2599,7 @@ ParseResult FIRStmtParser::parseRegister(unsigned regIndent) {
       parseExp(clock, subOps, "expected expression for register clock"))
     return failure();
   clock = convertToPassive(clock, clock.getLoc());
+  type = DuplexFlow::get(type);
 
   // Parse the 'with' specifier if present.
   Value resetSignal, resetValue;
@@ -2740,7 +2743,9 @@ FIRModuleParser::parsePortList(SmallVectorImpl<PortInfoAndLoc> &result,
 
     // If this is an output port, flip the type.
     if (isOutput)
-      type = FlipType::get(type);
+      type = SinkFlow::get(type);
+    else
+      type = SourceFlow::get(type);
 
     // FIXME: We should persist the info loc into the IR, not just the name
     // and type.
