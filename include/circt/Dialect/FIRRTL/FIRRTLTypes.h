@@ -35,6 +35,9 @@ class AnalogType;
 class FlipType;
 class BundleType;
 class FVectorType;
+class SourceFlow;
+class SinkFlow;
+class DuplexFlow;
 
 // This is a common base class for all FIRRTL types.
 class FIRRTLType : public Type {
@@ -284,6 +287,40 @@ public:
 
   /// Return this type with any flip types recursively removed from itself.
   FIRRTLType getPassiveType();
+};
+
+//===----------------------------------------------------------------------===//
+// Flow Types
+//===----------------------------------------------------------------------===//
+
+class SourceFlow : public FIRRTLType::TypeBase<SourceFlow, FIRRTLType,
+                                               detail::FlipTypeStorage> {
+public:
+  using Base::Base;
+
+  FIRRTLType getElementType();
+
+  static FIRRTLType get(FIRRTLType element);
+};
+
+class SinkFlow : public FIRRTLType::TypeBase<SinkFlow, FIRRTLType,
+                                             detail::FlipTypeStorage> {
+public:
+  using Base::Base;
+
+  FIRRTLType getElementType();
+
+  static FIRRTLType get(FIRRTLType element);
+};
+
+class DuplexFlow : public FIRRTLType::TypeBase<DuplexFlow, FIRRTLType,
+                                               detail::FlipTypeStorage> {
+public:
+  using Base::Base;
+
+  FIRRTLType getElementType();
+
+  static FIRRTLType get(FIRRTLType element);
 };
 
 } // namespace firrtl

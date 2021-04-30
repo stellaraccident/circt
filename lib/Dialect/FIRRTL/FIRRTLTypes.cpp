@@ -67,6 +67,21 @@ void FIRRTLType::print(raw_ostream &os) const {
         vectorType.getElementType().print(os);
         os << ", " << vectorType.getNumElements() << '>';
       })
+      .Case<SourceFlow>([&](SourceFlow sourceFlow) {
+        os << "source<";
+        sourceFlow.getElementType().print(os);
+        os << ">";
+      })
+      .Case<SinkFlow>([&](SinkFlow sinkFlow) {
+        os << "sink<";
+        sinkFlow.getElementType().print(os);
+        os << ">";
+      })
+      .Case<DuplexFlow>([&](DuplexFlow duplexFlow) {
+        os << "duplex<";
+        duplexFlow.getElementType().print(os);
+        os << ">";
+      })
       .Default([](Type) { assert(0 && "unknown dialect type to print"); });
 }
 
@@ -740,8 +755,35 @@ FIRRTLType FVectorType::getPassiveType() {
   return passiveType;
 }
 
+//===----------------------------------------------------------------------===//
+// Flow Types
+//===----------------------------------------------------------------------===//
+
+FIRRTLType SourceFlow::get(FIRRTLType element) {
+  return Base::get(element.getContext(), element).cast<FIRRTLType>();
+}
+
+FIRRTLType SourceFlow::getElementType() { return getImpl()->element; }
+
+FIRRTLType SinkFlow::get(FIRRTLType element) {
+  return Base::get(element.getContext(), element).cast<FIRRTLType>();
+}
+
+FIRRTLType SinkFlow::getElementType() { return getImpl()->element; }
+
+FIRRTLType DuplexFlow::get(FIRRTLType element) {
+  return Base::get(element.getContext(), element).cast<FIRRTLType>();
+}
+
+FIRRTLType DuplexFlow::getElementType() { return getImpl()->element; }
+
+//===----------------------------------------------------------------------===//
+// Registration of all the FIRRTL Types
+//===----------------------------------------------------------------------===//
+
 void FIRRTLDialect::registerTypes() {
   addTypes<SIntType, UIntType, ClockType, ResetType, AsyncResetType, AnalogType,
            // Derived Types
-           FlipType, BundleType, FVectorType>();
+           FlipType, BundleType, FVectorType, SourceFlow, SinkFlow,
+           DuplexFlow>();
 }
